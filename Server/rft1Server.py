@@ -52,14 +52,77 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
                         #Add last packet that covers the < 1000 bytes left over.
                         if fileSize % 1000 != 0: packets.append(fileBytes[end:len(fileBytes)])
                     #Send the packets back to back
-                    for packet in packets:
-                        print(len(packet))
-                        conn.send(packet)
-                    #Edge case, if packet is divisble by 1000 bytes, send "!" as EOF
-                    if fileSize % 1000 == 0:
-                        time.sleep(1)
-                        conn.send(b'!')
-                    print("Transfer Complete!")
+                    if len(message) == 3:
+                        if message[2] == "GBN":
+                            #Go Back N
+                            window_size = 4
+                            timeout = 5.0
+                            seq_num = 0
+                            expected_ack = 0
+                            window_start = 0
+                            window_end = window_size - 1
+
+                            # Send initial window of packets
+                            for i in range(window_size):
+                                packet = f'{seq_num:03d}'.encode() + packets[seq_num]
+                                server.sendto(packet, (HOST, PORT))
+                                print(f'Sent packet {seq_num}')
+                                seq_num += 1
+
+                            # Start timer
+                            start_time = time.time()
+
+                            while expected_ack < len(packets):
+                                # Wait for ACK or timeout
+                                server.settimeout(timeout - (time.time() - start_time))
+                                try:
+                                    data, address = server.recvfrom(4096)
+                                except socket.timeout:
+                                    # Timeout occurred, resend packets in window
+                                    print('Timeout, resending packets')
+                                    for i in range(window_start, window_end+1):
+                                        packet = f'{i:03d}'.encode() + packets[i]
+                                        server.sendto(packet, (HOST, PORT))
+                                        print(f'Resent packet {i}')
+                                    start_time = time.time()
+                                    continue
+                                
+                                # Parse ACK
+                                ack_num = int(data.decode())
+                                print(f'Received ACK {ack_num}')
+                                
+                                # Check if ACK is in window
+                                if ack_num < window_start or ack_num > window_end:
+                                    # Ignore out-of-window ACK
+                                    continue
+                                
+                                # Update expected ACK number and window boundaries
+                                expected_ack = ack_num + 1
+                                window_start = ack_num + 1
+                                window_end = min(window_start + window_size - 1, len(packets) - 1)
+                                
+                                # Send next packets in window
+                                for i in range(window_start, window_end+1):
+                                    packet = f'{i:03d}'.encode() + packets[i]
+                                    server.sendto(packet, (HOST, PORT))
+                                    print(f'Sent packet {i}')
+                                
+                                # Restart timer
+                                start_time = time.time()
+                            if fileSize % 1000 == 0:
+                                time.sleep(1)
+                                conn.send(b'!')
+                            print("Transfer Complete!")
+
+                    else:
+                        for packet in packets:
+                            print(len(packet))
+                            conn.send(packet)
+                        #Edge case, if packet is divisble by 1000 bytes, send "!" as EOF
+                        if fileSize % 1000 == 0:
+                            time.sleep(1)
+                            conn.send(b'!')
+                        print("Transfer Complete!")
             else:
                 print("File not found.")
                 conn.send(b'!')
