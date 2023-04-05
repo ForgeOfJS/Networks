@@ -5,7 +5,7 @@ HOST = input()
 print("Provide Port#: ", end="")
 PORT = int(input())
 
-#Look for and establish connection to server
+#Look for and establish connection to RECEIVER
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, PORT))
 print("You are now connected! Enter your commands now.")

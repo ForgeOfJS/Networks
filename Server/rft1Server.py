@@ -1,5 +1,7 @@
 import socket, sys, os, time
 
+def snwReceive(sock):
+
 HOST = "127.0.0.1"
 print("Listen at Port#: ", end="")
 PORT = int(input())
