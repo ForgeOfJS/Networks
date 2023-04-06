@@ -1,15 +1,19 @@
 import socket, sys, os, time
 
-def snwReceive(sock):
+def snwSender(sock, packetList):
+    print(sock)
 
 HOST = "127.0.0.1"
 print("Listen at Port#: ", end="")
 PORT = int(input())
 
 #Start server and listen for a connection.
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
     server.bind((HOST, PORT))
-    server.listen()
+
+    while True:
+        data, addr = sock.recvfrom(1024) # buffer size is 1024 bytes
+
     print(f'Listening for connection at {PORT}...')
     while True:
         #Connection is established.
