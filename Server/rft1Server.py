@@ -3,6 +3,8 @@ from packet import *
 from timer import *
 from udt import *
 
+seq = 0
+ack = 1
 
 HOST = "127.0.0.1"
 PORT = int(input("Listen at Port#: "))
@@ -10,7 +12,18 @@ address = (HOST, PORT)
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
     while True:
-        data = recv(server)
+        while True:
+            # Get packets
+            seqNum, data = extract(recv(server))
+
+            if data == b'':
+                continue
+
+            pack = make(seqNum, b'ACK')
+            send(pack)
+            break
+
+        seqNum, data = extract(recv(server))
         message = data.decode()
         # Check for CLOSE command and close connection if so.
         if message == 'CLOSE':
@@ -49,12 +62,17 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
                         # Add last packet that covers the < 1000 bytes left over.
                         if fileSize % 1000 != 0:
                             packets.append(fileBytes[end:len(fileBytes)])
-                    # Send the packets back to back
+
+                    # TRANSMISSION
                     for i in range(len(packets)):
-                        newPack = make(i, packets[i])
-                        print(len(packets[i]))
-                        send(newPack, server, address)
-                    # Edge case, if packet is divisble by 1000 bytes, send "!" as EOF
+                        while seq != ack:
+                            newPack = make(seq, packets[i])
+                            # print(len(packets[i]))
+                            send(newPack, server, address)
+                            ack, data = extract(recv(server))
+                        seq += 1
+
+                    # Edge case, if packet is divisible by 1000 bytes, send "!" as EOF
                     if fileSize % 1000 == 0:
                         time.sleep(1)
                         send(b'!')

@@ -3,6 +3,7 @@ from packet import *
 from timer import *
 from udt import *
 
+seq = 0
 
 HOST = input("Provide Server IP: ")
 PORT = int(input("Provide Port#: "))
@@ -16,7 +17,8 @@ clientRequest = input("RFTCli>")
 clientRequestSeq = clientRequest.split(" ")
 
 # Turn request into bytes and send request to server
-message = make(1, clientRequest.encode())
+message = make(seq, clientRequest.encode())
+seq += 1
 send(message, client, address)
 
 # If client requests a CLOSE then client should exit
@@ -30,15 +32,19 @@ file = open(returnFilePath, 'wb')
 # Start transferring packets
 while True:
     # Get packets
-    dat = recv(client)
-    seqNum, dat = extract(dat)
+    seqNum, dat = extract(recv(client))
+
     if dat == b'':
         continue
+
+    pack = make(seqNum, b'ACK')
+    send(pack, client, address)
 
     # Edge case, if command failed or file is divisible by 1000 bytes then stop file transfer
     if dat == b'!':
         break
-    print(len(dat))
+
+    # print(len(dat))
     file.write(dat)
     # Once a non 1000 byte packet is recieved then stop the transfer.
     if len(dat) != 1000:
