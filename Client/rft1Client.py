@@ -1,4 +1,7 @@
-import socket, os, sys, random
+import os
+import random
+import socket
+import sys
 
 DROP_PROB = 2
 
@@ -63,6 +66,10 @@ file = open(returnFilePath, 'wb')
 while True:
     # Get packets
     dat = recv(client)
+    seqNum, dat = extract(dat)
+    if dat == b'':
+        continue
+
     # Edge case, if command failed or file is divisible by 1000 bytes then stop file transfer
     if dat == b'!':
         break
