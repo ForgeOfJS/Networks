@@ -10,7 +10,6 @@ address = (HOST, PORT)
 
 # Look for and establish connection to server
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-print("You are now connected! Enter your commands now.")
 
 # Prompt user
 clientRequest = input("RFTCli>")
