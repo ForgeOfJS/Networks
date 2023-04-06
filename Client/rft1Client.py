@@ -4,10 +4,8 @@ from timer import *
 from udt import *
 
 
-print("Provide Server IP: ", end="")
-HOST = input()
-print("Provide Port#: ", end="")
-PORT = int(input())
+HOST = input("Provide Server IP: ")
+PORT = int(input("Provide Port#: "))
 address = (HOST, PORT)
 
 # Look for and establish connection to server
@@ -15,11 +13,11 @@ client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 print("You are now connected! Enter your commands now.")
 
 # Prompt user
-print("RFTCli>", end=" ")
-clientRequest = input().split(" ")
+clientRequest = input("RFTCli>")
+clientRequestSeq = clientRequest.split(" ")
 
 # Turn request into bytes and send request to server
-message = make(1, clientRequest)
+message = make(1, clientRequest.encode())
 send(message, client, address)
 
 # If client requests a CLOSE then client should exit
@@ -27,8 +25,9 @@ if clientRequest == "CLOSE":
     sys.exit()
 
 # Begin the file transfer, i.e. create the file to have data placed into.
-returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequest[1]}'
+returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequestSeq[1]}'
 file = open(returnFilePath, 'wb')
+
 # Start transferring packets
 while True:
     # Get packets
@@ -47,4 +46,4 @@ while True:
         break
 # File transfer is completed.
 file.close()
-print(f'Received {clientRequest[1]}')
+print(f'Received {clientRequestSeq[1]}')
