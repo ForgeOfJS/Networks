@@ -1,18 +1,22 @@
 import socket, os, sys, random
+
 DROP_PROB = 2
 
+
 # Creates a packet from a sequence number and byte data
-def make(seq_num, data = b''):
-    seq_bytes = seq_num.to_bytes(4, byteorder = 'little', signed = True)
+def make(seq_num, data=b''):
+    seq_bytes = seq_num.to_bytes(4, byteorder='little', signed=True)
     return seq_bytes + data
+
 
 # Creates an empty packet
 def make_empty():
     return b''
 
+
 # Extracts sequence number and data from a non-empty packet
 def extract(packet):
-    seq_num = int.from_bytes(packet[0:4], byteorder = 'little', signed = True)
+    seq_num = int.from_bytes(packet[0:4], byteorder='little', signed=True)
     return seq_num, packet[4:]
 
 
@@ -23,10 +27,12 @@ def send(packet, sock, addr):
         sock.sendto(packet, addr)
     return
 
+
 # Receive a packet from the unreliable channel
 def recv(sock):
     packet, addr = sock.recvfrom(1024)
     return packet, addr
+
 
 print("Provide Server IP: ", end="")
 HOST = input()
@@ -34,36 +40,37 @@ print("Provide Port#: ", end="")
 PORT = int(input())
 address = (HOST, PORT)
 
-#Look for and establish connection to server
+# Look for and establish connection to server
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 print("You are now connected! Enter your commands now.")
 
-#Prompt user
-print("RFTCli>", end = " ")
-clientRequest = input()
+# Prompt user
+print("RFTCli>", end=" ")
+clientRequest = input().split(" ")
 
-#Turn request into bytes and send request to server
-message = bytes(clientRequest, 'utf-8')
-clientRequestSeg = clientRequest.split(" ")
-client.sendall(message)
+# Turn request into bytes and send request to server
+message = make(1, clientRequest)
+send(message, client, address)
 
-#If client requests a CLOSE then client should exit
-if clientRequest == "CLOSE": sys.exit()
+# If client requests a CLOSE then client should exit
+if clientRequest == "CLOSE":
+    sys.exit()
 
-#Begin the file transfer, i.e. create the file to have data placed into.
-returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequestSeg[1]}'
+# Begin the file transfer, i.e. create the file to have data placed into.
+returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequest[1]}'
 file = open(returnFilePath, 'wb')
-#Start transfering packets
+# Start transferring packets
 while True:
-    #Get packets
-    data = recv(client)
-    #Edge case, if command failed or file is divisible by 1000 bytes then stop file transfer
-    if data == b'!': break
-    print(len(data))
-    file.write(data)
-    #Once a non 1000 byte packet is recieved then stop the transfer. 
-    if len(data) != 1000:
+    # Get packets
+    dat = recv(client)
+    # Edge case, if command failed or file is divisible by 1000 bytes then stop file transfer
+    if dat == b'!':
         break
-#File transfer is completed.
+    print(len(dat))
+    file.write(dat)
+    # Once a non 1000 byte packet is recieved then stop the transfer.
+    if len(dat) != 1000:
+        break
+# File transfer is completed.
 file.close()
-print(f'Recieved {clientRequestSeg[1]}')
+print(f'Received {clientRequest[1]}')
