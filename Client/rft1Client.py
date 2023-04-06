@@ -1,4 +1,4 @@
-import socket, os, sys, time
+import socket, os, sys, udt, timer, packet
 
 #print("Provide Server IP: ", end="")
 HOST = "127.0.0.1"#input()
@@ -42,8 +42,33 @@ if mode == 'TCP':
 elif mode == "GBN":
     client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     serverAddress = (HOST, PORT)
-    print("RFTCli>", end = " ")
-    clientRequest = input()
-    message = bytes(clientRequest, 'utf-8')
-    clientRequestSeg = clientRequest.split(" ")
-    client.sendto(message, serverAddress)
+    expectedSeqNum = 0
+    #initiate client
+    while True:
+        print("RFTCli>", end = " ")
+        clientRequest = input()
+        clientRequestSeg = clientRequest.split(" ")
+        message = bytes(clientRequest, 'utf-8')
+        udt.send(message, client, serverAddress)
+        if clientRequest == "CLOSE": sys.exit()
+        returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequestSeg[1]}'
+        file = open(returnFilePath, 'wb')   
+        #wait for packet
+        while True:
+            #read packet
+            data, addr = udt.recv(client)
+            seqNum, data = packet.extract(data)
+            if data == b'!': break
+            file.write(data)
+            if len(data) != 1000:
+                break
+            #if seqNum is expected send an ack, iterate expected
+            if seqNum == expectedSeqNum:
+                udt.send(data, client, serverAddress)
+                expectedSeqNum += 1
+                break
+            #else wait for packet
+        file.close()
+        print(f'Recieved {clientRequestSeg[1]}')
+
+
