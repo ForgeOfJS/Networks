@@ -1,11 +1,11 @@
-import socket, os, sys, udt, timer, packet
+import socket, os, sys, udt, customTimer, packetCustom
 
 #print("Provide Server IP: ", end="")
 HOST = "127.0.0.1"#input()
 #print("Provide Port#: ", end="")
 PORT = 8000#int(input())
 print("Provide Mode# (Type 'TCP' to skip UDP protocols): ", end="")
-mode = input()
+mode = "GBN"#input()
 
 if mode == 'TCP':
     #Look for and establish connection to server
@@ -44,31 +44,32 @@ elif mode == "GBN":
     serverAddress = (HOST, PORT)
     expectedSeqNum = 0
     #initiate client
+    print("RFTCli>", end = " ")
+    clientRequest = input()
+    clientRequestSeg = clientRequest.split(" ")
+    message = bytes(clientRequest, 'utf-8')
+    client.sendto(message, serverAddress)
+    print(message)
+    if clientRequest == "CLOSE": sys.exit()
+    returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequestSeg[1]}'
+    file = open(returnFilePath, 'wb')   
+    #wait for packet
     while True:
-        print("RFTCli>", end = " ")
-        clientRequest = input()
-        clientRequestSeg = clientRequest.split(" ")
-        message = bytes(clientRequest, 'utf-8')
-        udt.send(message, client, serverAddress)
-        if clientRequest == "CLOSE": sys.exit()
-        returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequestSeg[1]}'
-        file = open(returnFilePath, 'wb')   
-        #wait for packet
-        while True:
-            #read packet
-            data, addr = udt.recv(client)
-            seqNum, data = packet.extract(data)
-            if data == b'!': break
+        #read packet
+        data, addr = udt.recv(client)
+        seqNum, data = packetCustom.extract(data)
+        print(f'SeqNum recieved: {seqNum} | SeqNum Expected: {expectedSeqNum}')
+        if data == b'!': break
+        #if seqNum is expected send an ack, iterate expected
+        if seqNum == expectedSeqNum:
+            print(f'seqNum match! writing to file and sending Ack # {expectedSeqNum}')
             file.write(data)
+            client.sendto(f'{expectedSeqNum}'.encode(), serverAddress)
             if len(data) != 1000:
                 break
-            #if seqNum is expected send an ack, iterate expected
-            if seqNum == expectedSeqNum:
-                udt.send(data, client, serverAddress)
-                expectedSeqNum += 1
-                break
-            #else wait for packet
-        file.close()
-        print(f'Recieved {clientRequestSeg[1]}')
+            expectedSeqNum += 1
+        #else wait for packet
+    file.close()
+    print(f'Recieved {clientRequestSeg[1]}')
 
 
