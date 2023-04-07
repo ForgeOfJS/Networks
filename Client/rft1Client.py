@@ -1,9 +1,34 @@
-import os, random, socket, sys
+import os, socket, sys, time
 from packet import *
 from timer import *
 from udt import *
 
-seq = 0
+global seq
+
+seq = True
+
+
+def snwsend(sock, mess, addr):
+    global seq
+    dat = b''
+
+    ack = not seq
+    while seq != ack:
+        newpack = make(seq, mess)
+        print(f"{time.time()}: SENDING {mess}")
+        send(newpack, sock, addr)
+        if mess == b'ACK':
+            break
+        print(f"{time.time()}: WAITING FOR ACK {seq}")
+        try:
+            packet, addr = recv(sock)
+            ack, dat = extract(packet)
+            print(f"{time.time()}: ACK {seq} RECEIVED")
+        except socket.timeout:
+            continue
+    seq = not seq
+    return dat
+
 
 HOST = input("Provide Server IP: ")
 PORT = int(input("Provide Port#: "))
@@ -11,15 +36,15 @@ address = (HOST, PORT)
 
 # Look for and establish connection to server
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client.settimeout(5)
+client.connect(address)
 
 # Prompt user
 clientRequest = input("RFTCli>")
 clientRequestSeq = clientRequest.split(" ")
 
 # Turn request into bytes and send request to server
-message = make(seq, clientRequest.encode())
-seq += 1
-send(message, client, address)
+snwsend(client, clientRequest.encode(), address)
 
 # If client requests a CLOSE then client should exit
 if clientRequest == "CLOSE":
@@ -29,26 +54,41 @@ if clientRequest == "CLOSE":
 returnFilePath = f'{os.getcwd()}\FileStorage\copy_{clientRequestSeq[1]}'
 file = open(returnFilePath, 'wb')
 
+prevData = b''
 # Start transferring packets
 while True:
     # Get packets
-    seqNum, dat = extract(recv(client))
-
-    if dat == b'':
+    try:
+        pack, address = recv(client)
+        seqNum, data = extract(pack)
+        seq = seqNum
+    except socket.timeout:
         continue
 
-    pack = make(seqNum, b'ACK')
-    send(pack, client, address)
+    print(f"{time.time()}: RECEIVED {data}")
+
+
+    if data == b'':
+        print("EMPTY DATA")
+        continue
+
+    print(f"{time.time()}: SENDING ACK {seq}")
+    snwsend(client, b'ACK', address)
 
     # Edge case, if command failed or file is divisible by 1000 bytes then stop file transfer
-    if dat == b'!':
+    if data == b'!':
         break
 
     # print(len(dat))
-    file.write(dat)
-    # Once a non 1000 byte packet is recieved then stop the transfer.
-    if len(dat) != 1000:
+    if not prevData == data:
+        file.write(data)
+        prevData = data
+    else:
+        print(f"{time.time()}: DUPLICATE DATA. DISREGARDING.")
+
+    # Once a non 1000 byte packet is received then stop the transfer.
+    if len(data) != 1000:
         break
 # File transfer is completed.
 file.close()
-print(f'Received {clientRequestSeq[1]}')
+print(f'{time.time()}: Received {clientRequestSeq[1]}')

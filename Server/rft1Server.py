@@ -3,31 +3,63 @@ from packet import *
 from timer import *
 from udt import *
 
-seq = 0
-ack = 1
+global seq
+
+seq = True
+
+
+def snwsend(sock, mess, addr):
+    global seq
+    dat = b''
+
+    ack = not seq
+    while seq != ack:
+        newpack = make(seq, mess)
+        print(f"{time.time()}: SENDING {mess}")
+        send(newpack, sock, addr)
+        if mess == b'ACK' or mess == b'!':
+            break
+        print(f"{time.time()}: WAITING FOR ACK {seq}")
+        try:
+            packet, addr = recv(sock)
+            ack, dat = extract(packet)
+            print(f"{time.time()}: ACK {seq} RECEIVED")
+        except socket.timeout:
+            continue
+    seq = not seq
+    return dat
+
 
 HOST = "127.0.0.1"
 PORT = int(input("Listen at Port#: "))
 address = (HOST, PORT)
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
+    server.settimeout(5)
+    server.bind(address)
     while True:
         while True:
             # Get packets
-            seqNum, data = extract(recv(server))
-
-            if data == b'':
+            try:
+                pack, address = recv(server)
+                seqNum, data = extract(pack)
+            except socket.timeout:
                 continue
 
-            pack = make(seqNum, b'ACK')
-            send(pack)
+            print(f"{time.time()}: RECEIVED {data}")
+
+            if data == b'':
+                print("EMPTY DATA")
+                continue
+
+            print(f"{time.time()}: SENDING ACK {seq}")
+            snwsend(server, b'ACK', address)
             break
 
-        seqNum, data = extract(recv(server))
         message = data.decode()
         # Check for CLOSE command and close connection if so.
         if message == 'CLOSE':
-            print("Connection closed, See you later!")
+            print(f"{time.time()}: Connection closed, See you later!")
             server.close()
             sys.exit()
         # Check for RETR command and perform operation if so, otherwise send nothing.
@@ -41,8 +73,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
                 with open(requestedFilePath, 'rb') as file:
                     print("Sending the file...")
                     # Open and read the file as bytes
-                    fileContents = file.read()
-                    fileBytes = bytes(fileContents)
+                    fileBytes = bytes(file.read())
                     fileSize = len(fileBytes)
                     packets = []
                     # Check if filesize is smaller than the largest packet byte size allowed
@@ -53,34 +84,30 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
                         # Otherwise split file into 1000 bytes
                         # Find # of packets needed
                         numPackets = fileSize // 1000
+                        if fileSize % 1000 != 0:
+                            numPackets += 1
                         # Segment file into 1000 bytes sized packets
-                        for i in range(0, numPackets):
+                        for i in range(numPackets):
                             print()
                             start = i * 1000
-                            end = start + 1000
-                            packets.append(bytes(fileBytes[start:end]))
-                        # Add last packet that covers the < 1000 bytes left over.
-                        if fileSize % 1000 != 0:
-                            packets.append(fileBytes[end:len(fileBytes)])
+                            end = (i+1) * 1000
+                            if end > fileSize:
+                                end = fileSize
+                            packets.append(fileBytes[start:end])
 
                     # TRANSMISSION
                     for i in range(len(packets)):
-                        while seq != ack:
-                            newPack = make(seq, packets[i])
-                            # print(len(packets[i]))
-                            send(newPack, server, address)
-                            ack, data = extract(recv(server))
-                        seq += 1
+                        print(f"{time.time()}: SENDING PACKET {i}")
+                        snwsend(server, packets[i], address)
 
                     # Edge case, if packet is divisible by 1000 bytes, send "!" as EOF
                     if fileSize % 1000 == 0:
-                        time.sleep(1)
-                        send(b'!')
+                        snwsend(server, b'!', address)
                     print("Transfer Complete!")
             else:
                 print("File not found.")
-                send(b'!')
+                snwsend(server, b'!', address)
 
         else:
             print("Command not recognized.")
-            send(b'!')
+            snwsend(server, b'!', address)
