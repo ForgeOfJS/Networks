@@ -15,8 +15,11 @@ class Timer(object):
 
     # Stops the timer
     def stop(self):
+        stop = time.time()
+        start = self._start_time
         if self._start_time != self.TIMER_STOP:
             self._start_time = self.TIMER_STOP
+        return stop-start
 
     # Determines whether the timer is runnning
     def running(self):

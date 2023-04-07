@@ -3,13 +3,16 @@ from packet import *
 from timer import *
 from udt import *
 
-global seq
+global seq, tferTime, packSent, packResent
 
 seq = True
+tferTime = Timer(-1)
+packSent = 0
+packResent = 0
 
 
 def snwsend(sock, mess, addr):
-    global seq
+    global seq, packSent
     dat = b''
 
     ack = not seq
@@ -17,6 +20,7 @@ def snwsend(sock, mess, addr):
         newpack = make(seq, mess)
         print(f"{time.time()}: SENDING {mess}")
         send(newpack, sock, addr)
+        packSent += 1
         if mess == b'ACK':
             break
         print(f"{time.time()}: WAITING FOR ACK {seq}")
@@ -25,6 +29,7 @@ def snwsend(sock, mess, addr):
             ack, dat = extract(packet)
             print(f"{time.time()}: ACK {seq} RECEIVED")
         except socket.timeout:
+            packResent += 1
             continue
     seq = not seq
     return dat
@@ -43,8 +48,10 @@ client.connect(address)
 clientRequest = input("RFTCli>")
 clientRequestSeq = clientRequest.split(" ")
 
+tferTime.start()
 # Turn request into bytes and send request to server
 snwsend(client, clientRequest.encode(), address)
+
 
 # If client requests a CLOSE then client should exit
 if clientRequest == "CLOSE":
@@ -91,4 +98,4 @@ while True:
         break
 # File transfer is completed.
 file.close()
-print(f'{time.time()}: Received {clientRequestSeq[1]}')
+print(f'Received {clientRequestSeq[1]} after {tferTime.stop()} seconds and {packSent} packets and {packResent} retransmits')

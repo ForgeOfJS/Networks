@@ -3,13 +3,15 @@ from packet import *
 from timer import *
 from udt import *
 
-global seq
+global seq, packSent, packResent
 
 seq = True
+packSent = 0
+packResent = 0
 
 
 def snwsend(sock, mess, addr):
-    global seq
+    global seq, packSent, packResent
     dat = b''
 
     ack = not seq
@@ -17,6 +19,7 @@ def snwsend(sock, mess, addr):
         newpack = make(seq, mess)
         print(f"{time.time()}: SENDING {mess}")
         send(newpack, sock, addr)
+        packSent += 1
         if mess == b'ACK' or mess == b'!':
             break
         print(f"{time.time()}: WAITING FOR ACK {seq}")
@@ -25,6 +28,7 @@ def snwsend(sock, mess, addr):
             ack, dat = extract(packet)
             print(f"{time.time()}: ACK {seq} RECEIVED")
         except socket.timeout:
+            packResent += 1
             continue
     seq = not seq
     return dat
@@ -103,7 +107,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
                     # Edge case, if packet is divisible by 1000 bytes, send "!" as EOF
                     if fileSize % 1000 == 0:
                         snwsend(server, b'!', address)
-                    print("Transfer Complete!")
+                    print(f"Transfer Complete after sending {packSent} packets and {packResent} retransmits!")
             else:
                 print("File not found.")
                 snwsend(server, b'!', address)
