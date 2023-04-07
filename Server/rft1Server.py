@@ -2,10 +2,10 @@ import socket, sys, os, time;
 import customTimer, packet, udt
 
 HOST = "127.0.0.1"
-#print("Listen at Port#: ", end="")
-PORT = 8000 #int(input())
-print("Provide Mode# (Type 'TCP' to skip UDP protocols): ", end="")
-mode = "GBN"#input() 
+print("Listen at Port#: ", end="")
+PORT = int(input())
+print("Provide Mode# (Type 'TCP' to skip UDP protocols, 'GBN' For Go Back N): ", end="")
+mode = input() 
 
 if mode == "TCP":
     #Start server and listen for a connection.
@@ -83,85 +83,92 @@ elif mode == "GBN":
     windowEnd = windowSize - 1
     server.bind(serverAddress)
     print(f"Server listening on {PORT}...")
-    data, addr = udt.recv(server)
-    print(f'Recieved message from {addr}')
-    message = data.decode()
-    if message == 'CLOSE':
-        print("Connection closed, See you later!")
-        server.close()
-        sys.exit()
-    if message[:4] == "RETR":
-        message = message.split(" ")
-        requestedFilePath = f'{os.getcwd()}\FileStorage\{message[1]}'
-        packets = []
-        if os.path.isfile(requestedFilePath):
-            with open(requestedFilePath, 'rb') as file:
-                print("Sending the file...")
-                fileContents = file.read()
-                fileBytes = bytes(fileContents)
-                fileSize = len(fileBytes)
-                #Check if filesize is smaller than largest packet byte size allowed
-                #If so, then add to packets and send to client.
-                if fileSize <= 1000:
-                    packets.append(fileBytes)
-                else:
-                    #Otherwise split file into 1000 bytes
-                    #Find # of packets needed
-                    numPackets = fileSize // 1000
-                    #Segment file into 1000 bytes sized packets
-                    for i in range(0, numPackets):
-                        print()
-                        start = i * 1000
-                        end = start + 1000
-                        packets.append(bytearray(fileBytes[start:end]))
-                    #Add last packet that covers the < 1000 bytes left over.
-                    if fileSize % 1000 != 0: packets.append(fileBytes[end:len(fileBytes)])
-            #Send file using the GBN protocol
-            #Establish window
+    while True:
+        server.settimeout(10000)
+        data, addr = udt.recv(server)
+        print(f'Recieved message from {addr}')
+        message = data.decode()
+        if message == 'CLOSE':
+            print("Connection closed, See you later!")
+            server.close()
+            sys.exit()
+        if message[:4] == "RETR":
             server.settimeout(5)
-            for i in range(windowStart, windowEnd):
-                if i < len(packets):
-                    print(f'Sending packet{i} with seqNum {i}')
-                    packetToSend = packet.make(i, packets[i])
-                    udt.send(packetToSend, server, addr)
-            #Redundancy for first window, it works tho
-            #TODO: deal with redundancy and dont break the trasnmission
-            while expectedAck < len(packets):
-                try:
-                    print('Recieving ack...')
-                    ack, addr = udt.recv(server)
-                except socket.timeout:
-                    print("Timer ran out, resending window.")
-                    for i in range(windowStart, windowEnd):
-                        print(f'Sending packet{i} with seqNum {i}')
-                        packetToSend = packet.make(i, packets[i])
-                        udt.send(packetToSend, server, addr)
-                    packetTimer = customTimer.Timer(10)
-                    continue
-            
-                ackNum = int(ack.decode())
-
-                if ackNum < windowStart or ackNum > windowEnd:
-                    print('Invalid Ack, ignoring...')
-                    continue
-                expectedAck += 1
-                windowStart += 1
-                windowEnd += 1
-
-                #Send any packets not send in new window
+            message = message.split(" ")
+            requestedFilePath = f'{os.getcwd()}\FileStorage\{message[1]}'
+            packets = []
+            if os.path.isfile(requestedFilePath):
+                with open(requestedFilePath, 'rb') as file:
+                    print("Sending the file...")
+                    fileContents = file.read()
+                    fileBytes = bytes(fileContents)
+                    fileSize = len(fileBytes)
+                    #Check if filesize is smaller than largest packet byte size allowed
+                    #If so, then add to packets and send to client.
+                    if fileSize <= 1000:
+                        packets.append(fileBytes)
+                    else:
+                        #Otherwise split file into 1000 bytes
+                        #Find # of packets needed
+                        numPackets = fileSize // 1000
+                        #Segment file into 1000 bytes sized packets
+                        for i in range(0, numPackets):
+                            print()
+                            start = i * 1000
+                            end = start + 1000
+                            packets.append(bytearray(fileBytes[start:end]))
+                        #Add last packet that covers the < 1000 bytes left over.
+                        if fileSize % 1000 != 0: packets.append(fileBytes[end:len(fileBytes)])
+                #Send file using the GBN protocol
+                #Establish window
+                server.settimeout(5)
                 for i in range(windowStart, windowEnd):
-                    if i == expectedAck and i < len(packets):
+                    if i < len(packets):
                         print(f'Sending packet{i} with seqNum {i}')
                         packetToSend = packet.make(i, packets[i])
                         udt.send(packetToSend, server, addr)
-                packetTimer = customTimer.Timer(10)
-            print("Transfer Complete!")
+                #Redundancy for first window
+                #TODO: deal with redundancy and dont break the trasnmission
+                while expectedAck < len(packets):
+                    try:
+                        print('Recieving ack...')
+                        ack, addr = udt.recv(server)
+                    except socket.timeout:
+                        print("Timer ran out, resending window.")
+                        for i in range(windowStart, windowEnd):
+                            if i < len(packets):
+                                print(f'Sending packet{i} with seqNum {i}')
+                                packetToSend = packet.make(i, packets[i])
+                                udt.send(packetToSend, server, addr)
+                        continue
+                
+                    ackNum = int(ack.decode())
+
+                    if ackNum < windowStart or ackNum > windowEnd:
+                        print('Invalid Ack, ignoring...')
+                        continue
+                    expectedAck += 1
+                    windowStart += 1
+                    windowEnd += 1
+
+                    #Send any packets not send in new window
+                    for i in range(windowStart, windowEnd):
+                        if i == expectedAck and i < len(packets):
+                            print(f'Sending packet{i} with seqNum {i}')
+                            packetToSend = packet.make(i, packets[i])
+                            udt.send(packetToSend, server, addr)
+                print("Transfer Complete!")
+                seqNum = 0
+                expectedAck = 0
+                windowStart = 0
+                windowEnd = windowSize - 1
+                
+            else:
+                print("File not found.")
+                udt.send(b'!', server, addr)
         else:
-            print("File not found.")
+            print("Command not recongnized.")
             udt.send(b'!', server, addr)
-    else:
-        print("Command not recongnized.")
-        udt.send(b'!', server, addr)
         
             
 

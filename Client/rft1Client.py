@@ -1,11 +1,11 @@
 import socket, os, sys, udt, customTimer, packetCustom
 
-#print("Provide Server IP: ", end="")
-HOST = "127.0.0.1"#input()
-#print("Provide Port#: ", end="")
-PORT = 8000#int(input())
+print("Provide Server IP: ", end="")
+HOST = input()
+print("Provide Port#: ", end="")
+PORT = int(input())
 print("Provide Mode# (Type 'TCP' to skip UDP protocols): ", end="")
-mode = "GBN"#input()
+mode = input()
 
 if mode == 'TCP':
     #Look for and establish connection to server
