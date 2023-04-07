@@ -52,7 +52,6 @@ tferTime.start()
 # Turn request into bytes and send request to server
 snwsend(client, clientRequest.encode(), address)
 
-
 # If client requests a CLOSE then client should exit
 if clientRequest == "CLOSE":
     sys.exit()
@@ -70,21 +69,21 @@ while True:
         seqNum, data = extract(pack)
         seq = seqNum
     except socket.timeout:
+        packResent += 1
         continue
 
     print(f"{time.time()}: RECEIVED {data}")
-
 
     if data == b'':
         print("EMPTY DATA")
         continue
 
-    print(f"{time.time()}: SENDING ACK {seq}")
-    snwsend(client, b'ACK', address)
-
     # Edge case, if command failed or file is divisible by 1000 bytes then stop file transfer
     if data == b'!':
         break
+
+    print(f"{time.time()}: SENDING ACK {seq}")
+    snwsend(client, b'ACK', address)
 
     # print(len(dat))
     if not prevData == data:
@@ -98,4 +97,5 @@ while True:
         break
 # File transfer is completed.
 file.close()
-print(f'Received {clientRequestSeq[1]} after {tferTime.stop()} seconds and {packSent} packets and {packResent} retransmits')
+print(
+    f'\nReceived {clientRequestSeq[1]} after {tferTime.stop()} seconds.\nMinimum Packets Needed: {packSent-packResent}\nRetransmits: {packResent}\nTotal Packets Sent: {packSent}')

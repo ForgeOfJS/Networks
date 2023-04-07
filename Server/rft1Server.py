@@ -3,11 +3,12 @@ from packet import *
 from timer import *
 from udt import *
 
-global seq, packSent, packResent
+global seq, packSent, packResent, tferTime
 
 seq = True
 packSent = 0
 packResent = 0
+tferTime = Timer(-1)
 
 
 def snwsend(sock, mess, addr):
@@ -50,6 +51,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
             except socket.timeout:
                 continue
 
+            tferTime.start()
             print(f"{time.time()}: RECEIVED {data}")
 
             if data == b'':
@@ -75,7 +77,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
             # If file exists begin the transfer, otherwise send nothing.
             if os.path.isfile(requestedFilePath):
                 with open(requestedFilePath, 'rb') as file:
-                    print("Sending the file...")
+                    print("Sending the file...\n")
                     # Open and read the file as bytes
                     fileBytes = bytes(file.read())
                     fileSize = len(fileBytes)
@@ -92,7 +94,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
                             numPackets += 1
                         # Segment file into 1000 bytes sized packets
                         for i in range(numPackets):
-                            print()
                             start = i * 1000
                             end = (i+1) * 1000
                             if end > fileSize:
@@ -100,14 +101,17 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
                             packets.append(fileBytes[start:end])
 
                     # TRANSMISSION
-                    for i in range(len(packets)):
-                        print(f"{time.time()}: SENDING PACKET {i}")
-                        snwsend(server, packets[i], address)
+                    try:
+                        for i in range(len(packets)):
+                            print(f"{time.time()}: SENDING PACKET {i}")
+                            snwsend(server, packets[i], address)
 
-                    # Edge case, if packet is divisible by 1000 bytes, send "!" as EOF
-                    if fileSize % 1000 == 0:
-                        snwsend(server, b'!', address)
-                    print(f"Transfer Complete after sending {packSent} packets and {packResent} retransmits!")
+                        # Edge case, if packet is divisible by 1000 bytes, send "!" as EOF
+                        if fileSize % 1000 == 0:
+                            snwsend(server, b'!', address)
+                    except ConnectionResetError:
+                        print("Connection Closed")
+                    print(f"\nTransfer Complete after {tferTime.stop()} seconds.\nMinimum Packets Needed: {packSent-packResent}\nRetransmits: {packResent}\nTotal Packets Sent: {packSent}")
             else:
                 print("File not found.")
                 snwsend(server, b'!', address)
