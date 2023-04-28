@@ -1,5 +1,6 @@
 from pox.core import core
 import pox.openflow.libopenflow_01 as of
+import pox.lib.packet as pkt
 
 log = core.getLogger()
 
@@ -16,12 +17,16 @@ class Firewall (object):
     # This binds our PacketIn event listener
     connection.addListeners(self)
 
-    #add switch rules here
-
+    #ADDED switch rules here:
+    #Send message to switch which accepts ARP AND ICMP protocol connections.
+    #Handles ipv4 icmp protocols 
     connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=10,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
-    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=9,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
-    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=8,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
-    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=7,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
+    #Handles arp protocols dl_type = 0x0806
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=9,match=of.ofp_match(d1_type=0x0806)))
+    #Drop any other ipv6 and ipv4 connections
+    # ipv6 dl_type = 0x0806
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_IN_PORT),priority=8,match=of.ofp_match(d1_type=0x86dd)))
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_IN_PORT),priority=7,match=of.ofp_match(d1_type=0x0800)))
   def _handle_PacketIn (self, event):
     """
     Packets not handled by the router rules will be
