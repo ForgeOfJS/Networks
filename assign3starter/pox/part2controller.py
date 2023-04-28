@@ -18,6 +18,10 @@ class Firewall (object):
 
     #add switch rules here
 
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=10,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=9,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=8,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
+    connection.send(of.ofp_flow_mod(action=of.ofp_action_output(port=of.OFPP_FLOOD),priority=7,match=of.ofp_match(d1_type=0x0800, nw_proto=pkt.ipv4.ICMP_PROTOCOL)))
   def _handle_PacketIn (self, event):
     """
     Packets not handled by the router rules will be
